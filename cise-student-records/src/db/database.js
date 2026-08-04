@@ -92,6 +92,15 @@ function saveWebStore() {
 export async function initDatabase() {
   if (isNative) {
     sqlite = new SQLiteConnection(CapacitorSQLite)
+
+    // The global encryption secret MUST be registered before an encrypted
+    // ("secret" mode) connection is created or opened, otherwise the native
+    // layer throws "No Passphrase stored". Only set it once — check first.
+    const secretStored = await sqlite.isSecretStored()
+    if (!secretStored.result) {
+      await sqlite.setEncryptionSecret(ENCRYPTION_SECRET)
+    }
+
     const ret = await sqlite.checkConnectionsConsistency()
     const isConn = (await sqlite.isConnection(DB_NAME, false)).result
     if (ret.result && isConn) {
@@ -100,8 +109,6 @@ export async function initDatabase() {
       db = await sqlite.createConnection(DB_NAME, true, 'secret', 1, false)
     }
     await db.open()
-    // Sets/updates the encryption secret used to protect the file (SQLCipher).
-    await sqlite.setEncryptionSecret(ENCRYPTION_SECRET)
     await db.execute(SCHEMA)
   } else {
     loadWebStore()
